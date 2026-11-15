@@ -1,0 +1,14 @@
+# Lokal Supabase (supabase start). Ko'rsatilmagan sozlamalar CLI standartlarini oladi.
+project_id = "dokon-hisob"
+
+[api]
+schemas = ["public"]
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false

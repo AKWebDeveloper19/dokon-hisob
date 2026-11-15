@@ -258,8 +258,8 @@ describe("PIN", () => {
     expect(await check(token, memberCashierA, "2580")).toMatchObject({ ok: false, code: "device_invalid" });
     const lookup = await db.as(service, "select * from public.device_lookup($1)", [token]);
     expect(lookup.rowCount).toBe(0);
-    const live = await db.as(service, "select shop_id from public.device_lookup($1)", [deviceTokenA]);
-    expect(live.rows[0].shop_id).toBe(shopA);
+    const live = await db.as(service, "select shop_id, device_id from public.device_lookup($1)", [deviceTokenA]);
+    expect(live.rows[0]).toEqual({ shop_id: shopA, device_id: deviceA });
   });
 });
 
@@ -327,6 +327,20 @@ describe("Xodim qo‘shish", () => {
     expect((await db.as(user(ownerB), "select 1 from public.staff_logins where user_id = $1", [cashierA])).rowCount).toBe(
       0,
     );
+  });
+});
+
+describe("Xodimlar ro‘yxati", () => {
+  it("egasi ro‘yxatni PIN holati bilan oladi, hash chiqmaydi", async () => {
+    const r = await db.as(user(ownerA), "select * from public.list_shop_members($1)", [shopA]);
+    const kassir = r.rows.find((x) => x.membership_id === memberCashierA);
+    expect(kassir).toMatchObject({ login: "kassir.a", has_pin: true, role: "cashier", can_discount: true });
+    expect(Object.keys(kassir!)).not.toContain("pin_hash");
+  });
+
+  it("kassir va boshqa do‘kon egasi ro‘yxatni ololmaydi", async () => {
+    expect(await errorOf(db.as(user(cashierA), "select * from public.list_shop_members($1)", [shopA]))).toBe("forbidden");
+    expect(await errorOf(db.as(user(ownerB), "select * from public.list_shop_members($1)", [shopA]))).toBe("forbidden");
   });
 });
 

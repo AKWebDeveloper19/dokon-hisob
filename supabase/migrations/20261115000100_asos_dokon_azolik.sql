@@ -525,6 +525,31 @@ begin
   perform private.audit(v_shop, 'device.revoked', 'pos_device', p_device::text);
 end $$;
 
+-- Egasi uchun xodimlar ro‘yxati (PIN holati bilan, hash’siz).
+create function public.list_shop_members(p_shop uuid)
+returns table (
+  membership_id uuid, user_id uuid, full_name text, login text, role public.member_role, active boolean,
+  can_discount boolean, can_refund boolean, can_write_off boolean, can_receive boolean,
+  has_pin boolean, pin_locked_until timestamptz, created_at timestamptz
+)
+language plpgsql stable security definer set search_path = '' as $$
+#variable_conflict use_column
+begin
+  perform private.require_owner(p_shop, false);
+  return query
+  select m.id, m.user_id, coalesce(p.full_name, ''), sl.login, m.role, m.active,
+         m.can_discount, m.can_refund, m.can_write_off, m.can_receive,
+         (mp.membership_id is not null),
+         case when mp.locked_until > now() then mp.locked_until end,
+         m.created_at
+  from public.memberships m
+  left join public.profiles p on p.user_id = m.user_id
+  left join public.staff_logins sl on sl.user_id = m.user_id
+  left join public.membership_pins mp on mp.membership_id = m.id
+  where m.shop_id = p_shop
+  order by m.role, m.active desc, coalesce(p.full_name, '');
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- Faqat server (service_role) chaqiradigan funksiyalar: kassa qurilmasi va PIN
 -- ---------------------------------------------------------------------------
@@ -645,6 +670,7 @@ grant execute on function
   public.shop_is_writable(uuid),
   public.create_shop(text, text, text),
   public.get_shop_context(uuid),
+  public.list_shop_members(uuid),
   public.update_shop_settings(uuid, text, text, integer),
   public.add_staff_member(uuid, uuid, text, text, boolean, boolean, boolean, boolean),
   public.update_staff_member(uuid, text, boolean, boolean, boolean, boolean),
